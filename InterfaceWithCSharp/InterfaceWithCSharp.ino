@@ -1,14 +1,14 @@
 #define rLED 5
 #define gLED 4
 #define bLED 3
-#define STATUS 8
+#define STATUS 13
 
 bool connectedToClient = false;
 
 void setup() 
 {
   // put your setup code here, to run once:
-  Serial.begin(9600);
+  Serial.begin(115200);
   pinMode(rLED, OUTPUT);
   pinMode(bLED, OUTPUT);
   pinMode(gLED, OUTPUT);
@@ -25,6 +25,7 @@ void loop()
 			if (incomming == "DISCOVER")
 			{
 				Serial.println("ACKNOWLEDGE");
+        digitalWrite(STATUS, HIGH);
 				connectedToClient = true;
 			}
 		}
@@ -62,13 +63,10 @@ void loop()
 void ParseIncommingCommand(String inc) //Send commands in C# using SerialPort.Write, not SerialPort.WriteLine!
 {									   //Send commands in this format INPUTOUTPUT:PIN:HIGHLOW
 	String delimiter = ":";
-	
-	digitalWrite(STATUS, HIGH);
 	Serial.print(millis()/1000);
 	Serial.print("s RECEIVED COMMAND: ");
 	Serial.println(inc);
 	inc.toUpperCase();
-	digitalWrite(STATUS, LOW);
 	
 	String cmd1 = GetValue(inc, ':', 0);
 	String cmd2 = GetValue(inc, ':', 1);
