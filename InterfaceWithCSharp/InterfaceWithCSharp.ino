@@ -1,20 +1,18 @@
-#define rLED 5
-#define gLED 4
-#define bLED 3
 #define STATUS 13
+#define BUTTON 2
 
 bool connectedToClient = false;
+static bool isButtonDown = false;
 
 void setup() 
 {
-  // put your setup code here, to run once:
   Serial.begin(115200);
-  pinMode(rLED, OUTPUT);
-  pinMode(bLED, OUTPUT);
-  pinMode(gLED, OUTPUT);
   pinMode(STATUS, OUTPUT);
+  pinMode(BUTTON, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(BUTTON), SendButton, CHANGE);
 }
 
+bool buttonDebounce = false;
 void loop()
 {
 	while (!connectedToClient) //Wait for client hand-shake
@@ -27,41 +25,57 @@ void loop()
 				Serial.println("ACKNOWLEDGE");
         digitalWrite(STATUS, HIGH);
 				connectedToClient = true;
+        isButtonDown = !digitalRead(BUTTON);
 			}
 		}
 	}
 
 	if (connectedToClient)
 	{
-		if (Serial.available() > 0)
+    //Recieve commands
+		if (Serial.available() > 0) 
 		{
-			ParseIncommingCommand(Serial.readString());
-			/*
-			if (incommingString == "RED")
-				digitalWrite(rLED, HIGH);
-			else if (incommingString == "GREEN")
-				digitalWrite(gLED, HIGH);
-			else if (incommingString == "BLUE")
-				digitalWrite(bLED, HIGH);
-			else if (incommingString == "OFF")
-			{
-				digitalWrite(rLED, LOW);
-				digitalWrite(gLED, LOW);
-				digitalWrite(bLED, LOW);
-			}
+      String incomming = Serial.readString();
+      if (incomming == "DISCOVER") //If the client decides to reconnect, do not ignore the DISCOVER command.
+      {
+        Serial.println("ACKNOWLEDGE");
+        digitalWrite(STATUS, HIGH);
+        connectedToClient = true;
+        isButtonDown = !digitalRead(BUTTON);
+      }
+      else if(incomming == "TERMINATE")
+      {
+        digitalWrite(STATUS, LOW);
+        connectedToClient = false;
+      }
+      else
+      {
+           ParseIncommingCommand(incomming); 
+      }
 		}
-		else
-			digitalWrite(STATUS, LOW);
 
-		Serial.print("PHOTORESISTOR: ");
-		Serial.println(analogRead(A1));
-		*/
-		}
+    //Send Commands
+
+
+    
 	}
 }
 
+void SendButton()
+{
+     static unsigned long last_interrupt_time = 0;
+     unsigned long interrupt_time = millis();
+     if (interrupt_time - last_interrupt_time > 10) //Debounce check
+     {
+        Serial.println(isButtonDown == false ? "BUTTON_DOWN" : "BUTTON_UP");
+        isButtonDown = !isButtonDown;
+     }
+     last_interrupt_time = interrupt_time;
+}
+
+
 void ParseIncommingCommand(String inc) //Send commands in C# using SerialPort.Write, not SerialPort.WriteLine!
-{									   //Send commands in this format INPUTOUTPUT:PIN:HIGHLOW
+{									                      //Send C# commands in this format INPUTOUTPUT:PIN:HIGHLOW
 	String delimiter = ":";
 	Serial.print(millis()/1000);
 	Serial.print("s RECEIVED COMMAND: ");
