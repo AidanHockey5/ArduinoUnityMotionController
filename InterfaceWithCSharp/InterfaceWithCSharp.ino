@@ -1,15 +1,62 @@
+#include <Wire.h>
 #define STATUS 13
 #define BUTTON 2
+
+#define    MPU9250_ADDRESS            0x68
+#define    MAG_ADDRESS                0x0C
+#define    GYRO_FULL_SCALE_250_DPS    0x00  
+#define    GYRO_FULL_SCALE_500_DPS    0x08
+#define    GYRO_FULL_SCALE_1000_DPS   0x10
+#define    GYRO_FULL_SCALE_2000_DPS   0x18
+#define    ACC_FULL_SCALE_2_G        0x00  
+#define    ACC_FULL_SCALE_4_G        0x08
+#define    ACC_FULL_SCALE_8_G        0x10
+#define    ACC_FULL_SCALE_16_G       0x18
 
 bool connectedToClient = false;
 static bool isButtonDown = false;
 
+struct Vector3
+{
+  int16_t x;
+  int16_t y;
+  int16_t z;
+};
+
 void setup() 
 {
+  Wire.begin();
   Serial.begin(115200);
   pinMode(STATUS, OUTPUT);
   pinMode(BUTTON, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(BUTTON), SendButton, CHANGE);
+  // Configure gyroscope range
+  I2CwriteByte(MPU9250_ADDRESS,27,GYRO_FULL_SCALE_2000_DPS);
+  // Configure accelerometers range
+  I2CwriteByte(MPU9250_ADDRESS,28,ACC_FULL_SCALE_16_G);
+}
+
+void I2Cread(uint8_t Address, uint8_t Register, uint8_t Nbytes, uint8_t* Data)
+{
+  // Set register address
+  Wire.beginTransmission(Address);
+  Wire.write(Register);
+  Wire.endTransmission();
+  
+  // Read Nbytes
+  Wire.requestFrom(Address, Nbytes); 
+  uint8_t index=0;
+  while (Wire.available())
+  Data[index++]=Wire.read();
+}
+
+void I2CwriteByte(uint8_t Address, uint8_t Register, uint8_t Data)
+{
+  // Set register address
+  Wire.beginTransmission(Address);
+  Wire.write(Register);
+  Wire.write(Data);
+  Wire.endTransmission();
 }
 
 bool buttonDebounce = false;
@@ -55,10 +102,68 @@ void loop()
 		}
 
     //Send Commands
-
-
-    
+    isButtonDown = !digitalRead(BUTTON); //Even though the button is on an interupt system, the pin still needs to be checked to ensure the interupt has the correct button state.
+    SendGyroData();
+    delay(16.6);
 	}
+}
+
+Vector3 lastAccl;
+void SendGyroData()
+{
+    // Read accelerometer and gyroscope
+    uint8_t Buf[14];
+    I2Cread(MPU9250_ADDRESS,0x3B,14,Buf);
+
+    Vector3 accl;
+    // Create 16 bits values from 8 bits data
+    // Accelerometer
+    accl.x=-(Buf[0]<<8 | Buf[1]);
+    accl.y=-(Buf[2]<<8 | Buf[3]);
+    accl.z= Buf[4]<<8 | Buf[5];
+    
+    accl.x = map(accl.x, -3000, 3000, -360, 360); 
+    accl.y = map(accl.y, -3000, 3000, -360, 360); 
+    accl.z = map(accl.z, -3000, 3000, -360, 360); 
+    // Gyroscope
+    int16_t gx=-(Buf[8]<<8 | Buf[9]);
+    int16_t gy=-(Buf[10]<<8 | Buf[11]);
+    int16_t gz=Buf[12]<<8 | Buf[13];
+
+    if(VectorDistance(accl, lastAccl) > 5) //Compress accl data before sending
+    {
+         // Accelerometer Out
+        Serial.print("XYZ:");
+        Serial.print (accl.x,DEC); 
+        Serial.print (":");
+        Serial.print (accl.y,DEC);
+        Serial.print (":");
+        Serial.print (accl.z,DEC);  
+        Serial.print (":");
+        Serial.println(""); 
+        lastAccl = accl;
+    }
+    delay(16.6); //Delay for 60 updates per second.
+}
+
+float VectorDistance(Vector3 a, Vector3 b)
+{
+    return sqr( pow((b.x-a.x),2) + pow((b.y-a.y),2) + pow((b.z-a.z),2));
+}
+
+int sqr(int x) //Fast square Root
+{
+    int s, t;
+    s = 1;  t = x;
+    while (s < t) {
+        s <<= 1;
+        t >>= 1;
+    }
+    do {
+        t = s;
+        s = (x / s + s) >> 1;
+    } while (s < t);
+    return t;
 }
 
 void SendButton()
