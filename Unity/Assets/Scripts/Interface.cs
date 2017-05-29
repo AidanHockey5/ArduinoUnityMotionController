@@ -17,6 +17,7 @@ public class Interface : MonoBehaviour
 {
     static GameObject instance;
     public Transform playerTarget;
+    Grapple playerGrapple;
     public Dropdown portDropdown;
     public Text outputLog;
     public Vector3 acclData = Vector3.zero;
@@ -119,9 +120,18 @@ public class Interface : MonoBehaviour
                 }
             }
             if (cmd == "D")
+            {
+                if (playerGrapple != null)
+                    playerGrapple.FireGrapple();
                 Debug.Log("BUTTON_DOWN");
+            }
+
             if (cmd == "U")
+            {
+                if (playerGrapple != null)
+                    playerGrapple.ReleaseGrapple();
                 Debug.Log("BUTTON_UP");
+            }
             if (cmd == "C")
                 Debug.Log("CALIBRATE");
             acclCalibrated = GetAccelerometer(acclData);
@@ -131,13 +141,18 @@ public class Interface : MonoBehaviour
         }
     }
 
+    Vector3 lastAccData = Vector3.zero;
     Vector3 ParseAccelerometerData(string data)
     {
-        string[] splitResult = data.Split(stringDelimiters, StringSplitOptions.RemoveEmptyEntries);
-        int x = int.Parse(splitResult[0]);
-        int y = int.Parse(splitResult[1]);
-        int z = int.Parse(splitResult[2]);
-        return new Vector3(x, y, z);
+        try
+        {
+            string[] splitResult = data.Split(stringDelimiters, StringSplitOptions.RemoveEmptyEntries);
+            int x = int.Parse(splitResult[0]);
+            int y = int.Parse(splitResult[1]);
+            int z = int.Parse(splitResult[2]);
+            lastAccData = new Vector3(x,y,z);
+            return lastAccData;
+        } catch {Debug.Log("Malformed Serial Transmisison"); return lastAccData; }
     }
 
     void CalibrateAccelerometer()
@@ -210,7 +225,10 @@ public class Interface : MonoBehaviour
     {
         GameObject tmp = GameObject.FindGameObjectWithTag("Player");
         if (tmp != null)
+        {
             playerTarget = tmp.transform;
+            playerGrapple = playerTarget.GetComponent<Grapple>();
+        }
         else
             Debug.Log("No Player Object Found.");
     }
