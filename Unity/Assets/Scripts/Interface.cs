@@ -158,7 +158,7 @@ public class Interface : MonoBehaviour
     void CalibrateAccelerometer()
     {
         wantedDeadZone = acclData;
-        Quaternion rotateQuaternion = Quaternion.FromToRotation(new Vector3(0f, 0f, -1f), wantedDeadZone);
+        Quaternion rotateQuaternion = Quaternion.FromToRotation(new Vector3(0f, 0f, 1f), wantedDeadZone);
         //create identity matrix ... rotate our matrix to match up with down vec
         Matrix4x4 matrix = Matrix4x4.TRS(Vector3.zero, rotateQuaternion, new Vector3(1f, 1f, 1f));
         //get the inverse of the matrix
