@@ -4,11 +4,13 @@ using System.Collections;
 public class PlayerController : MonoBehaviour 
 {
 	GameController gc;
+    Interface arduino;
 	// Use this for initialization
 	void Start () 
 	{
 		gc = GameObject.FindGameObjectWithTag ("GameController").GetComponent<GameController> ();
-	}
+        arduino = GameObject.FindGameObjectWithTag("interface").GetComponent<Interface>();
+    }
 	
 	void OnCollisionEnter2D(Collision2D other)
 	{
@@ -19,7 +21,8 @@ public class PlayerController : MonoBehaviour
 		}
 		if (other.gameObject.tag == "killzone") 
 		{
-			gc.ReloadLevel();
-		}
+            //arduino.RumbleMotor(2f);
+            gc.ReloadLevel();
+        }
 	}
 }

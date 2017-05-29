@@ -1,6 +1,9 @@
 #include <Wire.h>
 #define STATUS 13
 #define BUTTON 2
+#define CALIBRATE_BUTTON 3
+#define POT A0
+#define RUMBLE 12
 
 #define    MPU9250_ADDRESS            0x68
 #define    MAG_ADDRESS                0x0C
@@ -14,12 +17,15 @@
 #define    ACC_FULL_SCALE_16_G       0x18
 
 #define ROTATION_COMMAND 'R'
+#define ZOOM_COMMAND 'Z'
 #define BUTTON_DOWN_COMMAND 'D'
 #define BUTTON_UP_COMMAND 'U'
 #define CALIBRATE_COMMAND 'C'
 
 bool connectedToClient = false;
 static bool isButtonDown = false;
+int shortBuzzTime = 50;
+unsigned long buzzMillis = 0; 
 
 struct Vector3
 {
@@ -33,8 +39,12 @@ void setup()
   Wire.begin();
   Serial.begin(115200);
   pinMode(STATUS, OUTPUT);
+  pinMode(RUMBLE, OUTPUT);
+  pinMode(POT, INPUT);
   pinMode(BUTTON, INPUT_PULLUP);
+  pinMode(CALIBRATE_BUTTON, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(BUTTON), SendButton, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(CALIBRATE_BUTTON), SendCalibrate, LOW);
   // Configure gyroscope range
   I2CwriteByte(MPU9250_ADDRESS,27,GYRO_FULL_SCALE_2000_DPS);
   // Configure accelerometers range
@@ -105,12 +115,33 @@ void loop()
            ParseIncommingCommand(incomming); 
       }
 		}
-
     //Send Commands
     isButtonDown = !digitalRead(BUTTON); //Even though the button is on an interupt system, the pin still needs to be checked to ensure the interupt has the correct button state.
-    SendGyroData();
+    bool isBuzzing = buzzMillis+shortBuzzTime > millis();
+    if(!isBuzzing)
+    {
+        SendGyroData();
+        SendPotValue();
+    }
+    digitalWrite(RUMBLE, isBuzzing); 
+    
     delay(16.6);
 	}
+}
+
+int lastPtValue = 0;
+void SendPotValue()
+{
+  int ptValue = analogRead(POT);
+  int z = map(ptValue, 0, 1024, 15, 60);
+  if(abs(lastPtValue-ptValue) > 2)
+  {
+      Serial.print(ZOOM_COMMAND); 
+      Serial.print(':');
+      Serial.print(z);
+      Serial.println("");
+      lastPtValue = ptValue;
+  }
 }
 
 Vector3 lastAccl;
@@ -177,39 +208,56 @@ void SendButton()
      if (interrupt_time - last_interrupt_time > 10) //Debounce check
      {
         Serial.println(isButtonDown == false ? BUTTON_DOWN_COMMAND : BUTTON_UP_COMMAND);
+        buzzMillis = interrupt_time;
         isButtonDown = !isButtonDown;
      }
      last_interrupt_time = interrupt_time;
 }
 
+void SendCalibrate()
+{
+     static unsigned long last_interrupt_time2 = 0;
+     unsigned long interrupt_time = millis();
+     if (interrupt_time - last_interrupt_time2 > 10) //Debounce check
+     {
+        Serial.println(CALIBRATE_COMMAND);
+     }
+     last_interrupt_time2 = interrupt_time;
+}
 
 void ParseIncommingCommand(String inc) //Send commands in C# using SerialPort.Write, not SerialPort.WriteLine!
-{									                      //Send C# commands in this format INPUTOUTPUT:PIN:HIGHLOW
-	String delimiter = ":";
-	Serial.print(millis()/1000);
-	Serial.print("s RECEIVED COMMAND: ");
-	Serial.println(inc);
-	inc.toUpperCase();
+{									                      //Send C# commands in this format PIN:INPUTOUTPUT:HIGHLOW
+	String delimiter = ":";               //EX:    12:1:1 (Set pin 12 to output and set to high)
+	//Serial.print(millis()/1000);
+	//Serial.print("s RECEIVED COMMAND: ");
+	//Serial.println(inc);
+	//inc.toUpperCase();
 	
 	String cmd1 = GetValue(inc, ':', 0);
 	String cmd2 = GetValue(inc, ':', 1);
 	String cmd3 = GetValue(inc, ':', 2);
-
-	int pin = cmd2.toInt();
-
-	if (cmd1 == "INPUT")
+  
+  int pin = cmd1.toInt();
+	//int inOut = cmd2.toInt();
+  //int highLow = cmd3.toInt();
+  
+  //pinMode(pin, inOut);
+  //pinMode(pin, highLow);
+  
+	if (cmd2 == "0")
 	{
 		pinMode(pin, INPUT);
 	}
-	else if (cmd1 == "OUTPUT")
+	else if (cmd2 == "1")
 	{
 		pinMode(pin, OUTPUT);
 	}
-	if (cmd3 == "HIGH")
+ 
+	if (cmd3 == "1")
 	{
 		digitalWrite(pin, HIGH);
 	}
-	else if (cmd3 == "LOW")
+	else if (cmd3 == "0")
 	{
 		digitalWrite(pin, LOW);
 	}

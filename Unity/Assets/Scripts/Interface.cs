@@ -25,7 +25,7 @@ public class Interface : MonoBehaviour
     bool isCalibrated = false;
     Matrix4x4 calibrationMatrix;
     Vector3 wantedDeadZone = Vector3.zero;
-    string[] stringDelimiters = new string[] { ":", "R" };
+    string[] stringDelimiters = new string[] { ":", "R", "Z" };
     SerialPort sp; 
     ushort timeOut = 1; //Important value. If not set, code will check for serial input forever.
     public ConnectionState connectionState = ConnectionState.WAIT;
@@ -61,6 +61,7 @@ public class Interface : MonoBehaviour
         sp.DtrEnable = false;
         sp.Open();
         sp.ReadTimeout = timeOut;
+        sp.WriteTimeout = 1;
         StartCoroutine(CheckPortForAck());
     }
 
@@ -133,12 +134,46 @@ public class Interface : MonoBehaviour
                 Debug.Log("BUTTON_UP");
             }
             if (cmd == "C")
+            {
+                CalibrateAccelerometer();
                 Debug.Log("CALIBRATE");
+            }
+
+            if(cmd.StartsWith("Z"))
+            {
+                if (Camera.main != null)
+                    AdjustZoom(cmd);
+                Debug.Log("ZOOM");
+            }
             acclCalibrated = GetAccelerometer(acclData);
             acclCalibrated = new Vector3(0, 0, -acclCalibrated.y);
             if(playerTarget != null)
                 playerTarget.transform.rotation = Quaternion.Slerp(playerTarget.transform.rotation, Quaternion.Euler(acclCalibrated), Time.deltaTime*10);
         }
+    }
+
+    public void RumbleMotor(float activeTime)
+    {
+        StartCoroutine(SendRumbleCommands(activeTime));
+    }
+
+    IEnumerator SendRumbleCommands(float activeTime)
+    {
+        SendToArduino("12:1:1"); //Set pin 12 as output and set high.
+        yield return new WaitForSeconds(activeTime);
+        SendToArduino("12:1:0"); //Set pin 12 as output and set low.
+        yield return null;
+    }
+
+    float lastZoomValue = 0f;
+    void AdjustZoom(string data)
+    {
+        try
+        {
+            string[] splitResult = data.Split(stringDelimiters, StringSplitOptions.RemoveEmptyEntries);
+            Camera.main.orthographicSize = float.Parse(splitResult[0]);
+        }
+        catch { Debug.Log("Malformed Zoom Command"); }
     }
 
     Vector3 lastAccData = Vector3.zero;
@@ -157,6 +192,7 @@ public class Interface : MonoBehaviour
 
     void CalibrateAccelerometer()
     {
+
         wantedDeadZone = acclData;
         Quaternion rotateQuaternion = Quaternion.FromToRotation(new Vector3(0f, 0f, 1f), wantedDeadZone);
         //create identity matrix ... rotate our matrix to match up with down vec
