@@ -15,7 +15,8 @@ public enum ConnectionState
 
 public class Interface : MonoBehaviour
 {
-    public Transform testTarget;
+    static GameObject instance;
+    public Transform playerTarget;
     public Dropdown portDropdown;
     public Text outputLog;
     public Vector3 acclData = Vector3.zero;
@@ -23,16 +24,28 @@ public class Interface : MonoBehaviour
     bool isCalibrated = false;
     Matrix4x4 calibrationMatrix;
     Vector3 wantedDeadZone = Vector3.zero;
-    string[] stringDelimiters = new string[] { ":", "XYZ" };
+    string[] stringDelimiters = new string[] { ":", "R" };
     SerialPort sp; 
     ushort timeOut = 1; //Important value. If not set, code will check for serial input forever.
     public ConnectionState connectionState = ConnectionState.WAIT;
-    // Use this for initialization
+
+    private void Awake()
+    {
+        if (instance)
+            Destroy(gameObject);
+        else
+        {
+            instance = this.gameObject;
+            DontDestroyOnLoad(instance);
+        }
+    }
+
     void Start ()
     {
         AppDomain.CurrentDomain.ProcessExit += new EventHandler(OnProcessExit);
         String[] ports = SerialPort.GetPortNames();
         portDropdown.AddOptions(ports.ToList());
+        FindPlayer();
     }
 
     public void CheckPort()
@@ -44,7 +57,7 @@ public class Interface : MonoBehaviour
         if (sp != null)
             sp.Close();
         sp = new SerialPort(port, 115200, Parity.None, 8, StopBits.One);
-        
+        sp.DtrEnable = false;
         sp.Open();
         sp.ReadTimeout = timeOut;
         StartCoroutine(CheckPortForAck());
@@ -85,6 +98,8 @@ public class Interface : MonoBehaviour
     {
         if (Input.GetKeyDown(KeyCode.Escape))
             CloseConnection();
+        if (Input.GetKeyDown(KeyCode.A))
+            Application.LoadLevel(Application.loadedLevel);
     }
 
     private void FixedUpdate() //Check for commands 60 times a second
@@ -94,7 +109,7 @@ public class Interface : MonoBehaviour
             string cmd = CheckForRecievedData();
             if (cmd == string.Empty)
                 return;
-            if(cmd.StartsWith("XYZ:"))//Recieved Accelerometer Command
+            if(cmd.StartsWith("R"))//Recieved Accelerometer Command
             {
                 acclData = ParseAccelerometerData(cmd);
                 if(!isCalibrated)
@@ -103,11 +118,16 @@ public class Interface : MonoBehaviour
                     CalibrateAccelerometer();
                 }
             }
-            if (cmd == "BUTTON_DOWN")
-                Debug.LogError("STOP");
+            if (cmd == "D")
+                Debug.Log("BUTTON_DOWN");
+            if (cmd == "U")
+                Debug.Log("BUTTON_UP");
+            if (cmd == "C")
+                Debug.Log("CALIBRATE");
             acclCalibrated = GetAccelerometer(acclData);
             acclCalibrated = new Vector3(0, 0, -acclCalibrated.y);
-            testTarget.transform.rotation = Quaternion.Slerp(testTarget.transform.rotation, Quaternion.Euler(acclCalibrated), Time.deltaTime*10);
+            if(playerTarget != null)
+                playerTarget.transform.rotation = Quaternion.Slerp(playerTarget.transform.rotation, Quaternion.Euler(acclCalibrated), Time.deltaTime*10);
         }
     }
 
@@ -181,4 +201,17 @@ public class Interface : MonoBehaviour
         catch { return string.Empty; }
     }
 
+    private void OnLevelWasLoaded(int level)
+    {
+        FindPlayer();
+    }
+
+    void FindPlayer()
+    {
+        GameObject tmp = GameObject.FindGameObjectWithTag("Player");
+        if (tmp != null)
+            playerTarget = tmp.transform;
+        else
+            Debug.Log("No Player Object Found.");
+    }
 }

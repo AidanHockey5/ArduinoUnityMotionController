@@ -13,6 +13,11 @@
 #define    ACC_FULL_SCALE_8_G        0x10
 #define    ACC_FULL_SCALE_16_G       0x18
 
+#define ROTATION_COMMAND 'R'
+#define BUTTON_DOWN_COMMAND 'D'
+#define BUTTON_UP_COMMAND 'U'
+#define CALIBRATE_COMMAND 'C'
+
 bool connectedToClient = false;
 static bool isButtonDown = false;
 
@@ -133,13 +138,12 @@ void SendGyroData()
     if(VectorDistance(accl, lastAccl) > 5) //Compress accl data before sending
     {
          // Accelerometer Out
-        Serial.print("XYZ:");
+        Serial.print(ROTATION_COMMAND);
         Serial.print (accl.x,DEC); 
         Serial.print (":");
         Serial.print (accl.y,DEC);
         Serial.print (":");
         Serial.print (accl.z,DEC);  
-        Serial.print (":");
         Serial.println(""); 
         lastAccl = accl;
     }
@@ -172,7 +176,7 @@ void SendButton()
      unsigned long interrupt_time = millis();
      if (interrupt_time - last_interrupt_time > 10) //Debounce check
      {
-        Serial.println(isButtonDown == false ? "BUTTON_DOWN" : "BUTTON_UP");
+        Serial.println(isButtonDown == false ? BUTTON_DOWN_COMMAND : BUTTON_UP_COMMAND);
         isButtonDown = !isButtonDown;
      }
      last_interrupt_time = interrupt_time;
