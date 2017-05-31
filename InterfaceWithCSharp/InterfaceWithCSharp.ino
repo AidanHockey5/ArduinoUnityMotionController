@@ -112,7 +112,7 @@ void loop()
       }
       else
       {
-           ParseIncommingCommand(incomming); 
+        ParseIncommingCommand(incomming); 
       }
 		}
     //Send Commands
@@ -125,7 +125,7 @@ void loop()
     }
     digitalWrite(RUMBLE, isBuzzing); 
     
-    delay(16.6);
+    delay(16.6); //Delay to match 60 updates per second. Otherwise, the serial bus would be flooded with commands.
 	}
 }
 
@@ -230,44 +230,20 @@ void ParseIncommingCommand(String inc) //Send commands in C# using SerialPort.Wr
 	String delimiter = ":";               //EX:    12:1:1 (Set pin 12 to output and set to high)
 	//Serial.print(millis()/1000);
 	//Serial.print("s RECEIVED COMMAND: ");
-	//Serial.println(inc);
-	//inc.toUpperCase();
-	
+	//Serial.println(inc);	
 	String cmd1 = GetValue(inc, ':', 0);
 	String cmd2 = GetValue(inc, ':', 1);
 	String cmd3 = GetValue(inc, ':', 2);
   
   int pin = cmd1.toInt();
-	//int inOut = cmd2.toInt();
-  //int highLow = cmd3.toInt();
-  
-  //pinMode(pin, inOut);
-  //pinMode(pin, highLow);
-  
-	if (cmd2 == "0")
-	{
-		pinMode(pin, INPUT);
-	}
-	else if (cmd2 == "1")
-	{
-		pinMode(pin, OUTPUT);
-	}
- 
-	if (cmd3 == "1")
-	{
-		digitalWrite(pin, HIGH);
-	}
-	else if (cmd3 == "0")
-	{
-		digitalWrite(pin, LOW);
-	}
+  pinMode(pin, cmd2 == "0" ? INPUT : OUTPUT); 
+  pinMode(pin, cmd3 == "1" ? HIGH : LOW); 
 }
 
 String GetValue(String data, char separator, int index) //split strings by delimiters
 {
 	int found = 0;
-	int strIndex[] = {
-		0, -1 };
+	int strIndex[] = {0, -1 };
 	int maxIndex = data.length() - 1;
 	for (int i = 0; i <= maxIndex && found <= index; i++) {
 		if (data.charAt(i) == separator || i == maxIndex) {
