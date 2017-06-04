@@ -21,6 +21,7 @@
 #define BUTTON_DOWN_COMMAND 'D'
 #define BUTTON_UP_COMMAND 'U'
 #define CALIBRATE_COMMAND 'C'
+#define COLOR_COMMAND "COL"
 
 bool connectedToClient = false;
 static bool isButtonDown = false;
@@ -33,6 +34,16 @@ struct Vector3
   int16_t y;
   int16_t z;
 };
+byte RGBPins[3] = {11,10,9};
+Vector3 localRGBColor = {255,255,255};
+Vector3 gameRGBColor = {255,255,255};
+float redBias = 1;
+float greenBias = 0.5;
+float blueBias = 0.5;
+
+//Equality operator overloads for Vector3
+inline bool operator==(const Vector3& lhs, const Vector3& rhs){ if(lhs.x == rhs.x && lhs.y == rhs.y && lhs.z == rhs.z)return true; else return false; }
+inline bool operator!=(const Vector3& lhs, const Vector3& rhs){ return !(lhs == rhs); }
 
 void setup() 
 {
@@ -43,6 +54,7 @@ void setup()
   pinMode(POT, INPUT);
   pinMode(BUTTON, INPUT_PULLUP);
   pinMode(CALIBRATE_BUTTON, INPUT_PULLUP);
+  for(int i = 0; i<3; i++) pinMode(RGBPins[i], OUTPUT);
   attachInterrupt(digitalPinToInterrupt(BUTTON), SendButton, CHANGE);
   attachInterrupt(digitalPinToInterrupt(CALIBRATE_BUTTON), SendCalibrate, LOW);
   // Configure gyroscope range
@@ -75,6 +87,7 @@ void I2CwriteByte(uint8_t Address, uint8_t Register, uint8_t Data)
 }
 
 bool buttonDebounce = false;
+int16_t rgbCount = 250;
 void loop()
 {
 	while (!connectedToClient) //Wait for client hand-shake
@@ -124,23 +137,59 @@ void loop()
         SendPotValue();
     }
     digitalWrite(RUMBLE, isBuzzing); 
+
+    if(localRGBColor != gameRGBColor)
+    {
+      FadeColors();
+    }
+
+    if(rgbCount >= 300)
+    {
+       GenerateColor();
+       rgbCount = 0;
+    }
+
     
     delay(16.6); //Delay to match 60 updates per second. Otherwise, the serial bus would be flooded with commands.
+    rgbCount++;
 	}
+
 }
 
-int lastPtValue = 0;
+void FadeColors()
+{
+  StepInt(localRGBColor.x, gameRGBColor.x*redBias, 5);
+  StepInt(localRGBColor.y, gameRGBColor.y*greenBias, 5);
+  StepInt(localRGBColor.z, gameRGBColor.z*blueBias, 5);
+  analogWrite(RGBPins[0], localRGBColor.x); //Red
+  analogWrite(RGBPins[1], localRGBColor.y); //Green
+  analogWrite(RGBPins[2], localRGBColor.z); //Blue
+}
+
+void StepInt(int16_t &a, int16_t b, uint16_t rate)
+{
+  if(a == b)
+    return;
+  if(b > a)
+    a+=rate;
+  else
+    a-=rate;
+  if(a>=255) a = 255;
+  if(a<=0) a = 0;
+}
+
+int lastPtValue = 1;
 void SendPotValue()
 {
   int ptValue = analogRead(POT);
   int z = map(ptValue, 0, 1024, 15, 60);
-  if(abs(lastPtValue-ptValue) > 2)
+  if(z != lastPtValue)
   {
       Serial.print(ZOOM_COMMAND); 
       Serial.print(':');
       Serial.print(z);
       Serial.println("");
-      lastPtValue = ptValue;
+      lastPtValue = z;
   }
 }
 
@@ -210,6 +259,7 @@ void SendButton()
         Serial.println(isButtonDown == false ? BUTTON_DOWN_COMMAND : BUTTON_UP_COMMAND);
         buzzMillis = interrupt_time;
         isButtonDown = !isButtonDown;
+        randomSeed(interrupt_time);
      }
      last_interrupt_time = interrupt_time;
 }
@@ -227,7 +277,7 @@ void SendCalibrate()
 
 void ParseIncommingCommand(String inc) //Send commands in C# using SerialPort.Write, not SerialPort.WriteLine!
 {									                      //Send C# commands in this format PIN:INPUTOUTPUT:HIGHLOW
-	String delimiter = ":";               //EX:    12:1:1 (Set pin 12 to output and set to high)
+                                        //EX:    12:1:1 (Set pin 12 to output and set to high)
 	//Serial.print(millis()/1000);
 	//Serial.print("s RECEIVED COMMAND: ");
 	//Serial.println(inc);	
@@ -238,6 +288,17 @@ void ParseIncommingCommand(String inc) //Send commands in C# using SerialPort.Wr
   int pin = cmd1.toInt();
   pinMode(pin, cmd2 == "0" ? INPUT : OUTPUT); 
   pinMode(pin, cmd3 == "1" ? HIGH : LOW); 
+}
+
+void GenerateColor()
+{
+  randomSeed(millis());
+  gameRGBColor.x = random(0,255);
+  gameRGBColor.y = random(0,255);
+  gameRGBColor.z = random(0,255);
+  Serial.print(COLOR_COMMAND); Serial.print(gameRGBColor.x); 
+  Serial.print(":"); Serial.print(gameRGBColor.y); 
+  Serial.print(":"); Serial.print(gameRGBColor.z); Serial.println("");
 }
 
 String GetValue(String data, char separator, int index) //split strings by delimiters

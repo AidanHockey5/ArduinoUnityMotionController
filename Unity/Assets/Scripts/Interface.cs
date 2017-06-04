@@ -16,6 +16,7 @@ public enum ConnectionState
 public class Interface : MonoBehaviour
 {
     static GameObject instance;
+    static float zoomLevel = 0;
     public Transform playerTarget;
     Grapple playerGrapple;
     public Dropdown portDropdown;
@@ -25,7 +26,7 @@ public class Interface : MonoBehaviour
     bool isCalibrated = false;
     Matrix4x4 calibrationMatrix;
     Vector3 wantedDeadZone = Vector3.zero;
-    string[] stringDelimiters = new string[] { ":", "R", "Z" };
+    string[] stringDelimiters = new string[] { ":", "R", "Z", "COL" };
     SerialPort sp; 
     ushort timeOut = 1; //Important value. If not set, code will check for serial input forever.
     public ConnectionState connectionState = ConnectionState.WAIT;
@@ -138,18 +139,47 @@ public class Interface : MonoBehaviour
                 CalibrateAccelerometer();
                 Debug.Log("CALIBRATE");
             }
-
-            if(cmd.StartsWith("Z"))
+            if (cmd.StartsWith("COL"))
+            {
+                if (Camera.main != null)
+                    ParseRGB(cmd);
+                Debug.Log("COLOR");
+            }
+            if (cmd.StartsWith("Z"))
             {
                 if (Camera.main != null)
                     AdjustZoom(cmd);
                 Debug.Log("ZOOM");
             }
+            Camera.main.orthographicSize = zoomLevel;
             acclCalibrated = GetAccelerometer(acclData);
             acclCalibrated = new Vector3(0, 0, -acclCalibrated.y);
             if(playerTarget != null)
                 playerTarget.transform.rotation = Quaternion.Slerp(playerTarget.transform.rotation, Quaternion.Euler(acclCalibrated), Time.deltaTime*10);
         }
+    }
+
+    void ParseRGB(string cmd)
+    {
+        try
+        {
+            string[] splitResult = cmd.Split(stringDelimiters, StringSplitOptions.RemoveEmptyEntries);
+            byte r = byte.Parse(splitResult[0]);
+            byte g = byte.Parse(splitResult[1]);
+            byte b = byte.Parse(splitResult[2]);
+            Color32 color = new Color32(r, g, b, 1);
+            Camera.main.GetComponent<SkyboxColor>().SetColor(color);
+        }
+        catch { Debug.Log("Malformed RGB Command"); }
+    }
+
+    public void SendColorToArduino(Color c)
+    {
+        if (connectionState != ConnectionState.CONNECTED)
+            return;
+        Color32 convertTo32 = c;
+        string command = "C:" + convertTo32.r.ToString() + ":" + convertTo32.g.ToString() + ":" + convertTo32.b.ToString();
+        SendToArduino(command);
     }
 
     public void RumbleMotor(float activeTime)
@@ -171,7 +201,7 @@ public class Interface : MonoBehaviour
         try
         {
             string[] splitResult = data.Split(stringDelimiters, StringSplitOptions.RemoveEmptyEntries);
-            Camera.main.orthographicSize = float.Parse(splitResult[0]);
+            zoomLevel = float.Parse(splitResult[0]);
         }
         catch { Debug.Log("Malformed Zoom Command"); }
     }
