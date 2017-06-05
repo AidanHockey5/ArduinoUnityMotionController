@@ -15,8 +15,9 @@ public enum ConnectionState
 
 public class Interface : MonoBehaviour
 {
+    public bool showFullArduinoIncommingCommands = true;
     static GameObject instance;
-    static float zoomLevel = 0;
+    static float zoomLevel = 15f;
     public Transform playerTarget;
     Grapple playerGrapple;
     public Dropdown portDropdown;
@@ -30,6 +31,10 @@ public class Interface : MonoBehaviour
     SerialPort sp; 
     ushort timeOut = 1; //Important value. If not set, code will check for serial input forever.
     public ConnectionState connectionState = ConnectionState.WAIT;
+
+    AudioSource audioSource;
+    public AudioClip adjustZoomSound;
+    public AudioClip fireGrapple;
 
     private void Awake()
     {
@@ -48,6 +53,7 @@ public class Interface : MonoBehaviour
         String[] ports = SerialPort.GetPortNames();
         portDropdown.AddOptions(ports.ToList());
         FindPlayer();
+        audioSource = GetComponent<AudioSource>();
     }
 
     public void CheckPort()
@@ -79,13 +85,14 @@ public class Interface : MonoBehaviour
                 connectTime += Time.deltaTime;
                 outputLog.text = "Send DISCOVER to port. T+: " + connectTime.ToString("0.0");
                 yield return null;
-            } while (reply == string.Empty && connectTime < 5);
+            } while (reply == string.Empty && connectTime < 2);
             //string reply = CheckForRecievedData();
             outputLog.text = "Device reply: " + reply;
             if (reply == "ACKNOWLEDGE")
             {
                 connectionState = ConnectionState.CONNECTED;
                 outputLog.color = Color.green;
+                GameObject.FindGameObjectWithTag("music").GetComponent<MusicController>().StartMusic();
             }
             else
             {
@@ -124,7 +131,11 @@ public class Interface : MonoBehaviour
             if (cmd == "D")
             {
                 if (playerGrapple != null)
+                {
                     playerGrapple.FireGrapple();
+                    audioSource.PlayOneShot(fireGrapple);
+                }
+
                 Debug.Log("BUTTON_DOWN");
             }
 
@@ -148,7 +159,11 @@ public class Interface : MonoBehaviour
             if (cmd.StartsWith("Z"))
             {
                 if (Camera.main != null)
+                {
                     AdjustZoom(cmd);
+                    audioSource.PlayOneShot(adjustZoomSound);
+                }
+
                 Debug.Log("ZOOM");
             }
             Camera.main.orthographicSize = zoomLevel;
@@ -269,7 +284,7 @@ public class Interface : MonoBehaviour
         {
             string inData = sp.ReadLine();
             int inSize = inData.Count();
-            if (inSize > 0)
+            if (inSize > 0 && showFullArduinoIncommingCommands)
             {
                 Debug.Log("ARDUINO->|| " + inData + " ||MSG SIZE:" + inSize.ToString());
             }
@@ -285,6 +300,7 @@ public class Interface : MonoBehaviour
     private void OnLevelWasLoaded(int level)
     {
         FindPlayer();
+        Camera.main.orthographicSize = zoomLevel;
     }
 
     void FindPlayer()

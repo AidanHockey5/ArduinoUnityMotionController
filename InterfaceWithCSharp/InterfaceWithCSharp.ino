@@ -25,7 +25,7 @@
 
 bool connectedToClient = false;
 static bool isButtonDown = false;
-int shortBuzzTime = 50;
+int shortBuzzTime = 25;
 unsigned long buzzMillis = 0; 
 
 struct Vector3
@@ -38,8 +38,8 @@ byte RGBPins[3] = {11,10,9};
 Vector3 localRGBColor = {255,255,255};
 Vector3 gameRGBColor = {255,255,255};
 float redBias = 1;
-float greenBias = 0.5;
-float blueBias = 0.5;
+float greenBias = 0.25;
+float blueBias = 0.25;
 
 //Equality operator overloads for Vector3
 inline bool operator==(const Vector3& lhs, const Vector3& rhs){ if(lhs.x == rhs.x && lhs.y == rhs.y && lhs.z == rhs.z)return true; else return false; }
@@ -129,7 +129,7 @@ void loop()
       }
 		}
     //Send Commands
-    isButtonDown = !digitalRead(BUTTON); //Even though the button is on an interupt system, the pin still needs to be checked to ensure the interupt has the correct button state.
+    
     bool isBuzzing = buzzMillis+shortBuzzTime > millis();
     if(!isBuzzing)
     {
@@ -150,7 +150,8 @@ void loop()
     }
 
     
-    delay(16.6); //Delay to match 60 updates per second. Otherwise, the serial bus would be flooded with commands.
+    delay(16.2); //Delay to match 60 updates per second. Otherwise, the serial bus would be flooded with commands.
+    isButtonDown = !digitalRead(BUTTON); //Even though the button is on an interupt system, the pin still needs to be checked to ensure the interupt has the correct button state.
     rgbCount++;
 	}
 
@@ -227,7 +228,7 @@ void SendGyroData()
         Serial.println(""); 
         lastAccl = accl;
     }
-    delay(16.6); //Delay for 60 updates per second.
+    //delay(16.6); //Delay for 60 updates per second.
 }
 
 float VectorDistance(Vector3 a, Vector3 b)
@@ -259,7 +260,6 @@ void SendButton()
         Serial.println(isButtonDown == false ? BUTTON_DOWN_COMMAND : BUTTON_UP_COMMAND);
         buzzMillis = interrupt_time;
         isButtonDown = !isButtonDown;
-        randomSeed(interrupt_time);
      }
      last_interrupt_time = interrupt_time;
 }

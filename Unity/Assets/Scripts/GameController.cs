@@ -9,6 +9,7 @@ public class GameController : MonoBehaviour
 {
 	public GameObject target;
 	public GameObject killZone;
+    public GameObject bounds;
     public GameObject player;
     public Text targetCountText, levelCountText;
     List<GameObject> targetList = new List<GameObject>();
@@ -17,10 +18,13 @@ public class GameController : MonoBehaviour
 	int score = 0;
     int level = 1;
 	public Vector2 stageSize = new Vector2(50, 50);
-	
+    public AudioClip levelUpSound;
+    AudioSource audioSource;
+
 	void Start () 
 	{
         StartCoroutine(TargetCheck());
+        audioSource = GetComponent<AudioSource>();
 	}
 
     IEnumerator TargetCheck()
@@ -36,6 +40,7 @@ public class GameController : MonoBehaviour
             targetCountText.text = "Targets: " + score.ToString() + "/" + targetsToSpawn.ToString();
             levelCountText.text = "Level " + level.ToString();
             yield return new WaitUntil(() => targetList.Count == 0);
+            audioSource.PlayOneShot(levelUpSound, 0.25f);
             level++;
             targetsToSpawn += 3;
             killzonesToSpawn += 2;
@@ -90,13 +95,13 @@ public class GameController : MonoBehaviour
 		}
 
 		//Generate stage bounds
-		GameObject l = Instantiate(killZone, new Vector2(-stageSize.x-5, 0), Quaternion.identity) as GameObject;
+		GameObject l = Instantiate(bounds, new Vector2(-stageSize.x-5, 0), Quaternion.identity) as GameObject;
 		l.transform.localScale = new Vector2 (1, stageSize.y);
-		GameObject r = Instantiate(killZone, new Vector2(stageSize.x+5, 0), Quaternion.identity) as GameObject;
+		GameObject r = Instantiate(bounds, new Vector2(stageSize.x+5, 0), Quaternion.identity) as GameObject;
 		r.transform.localScale = new Vector2 (1, stageSize.y);
-		GameObject u = Instantiate(killZone, new Vector2(0, stageSize.y+5), Quaternion.identity) as GameObject;
+		GameObject u = Instantiate(bounds, new Vector2(0, stageSize.y+5), Quaternion.identity) as GameObject;
 		u.transform.localScale = new Vector2 (stageSize.x, 1);
-		GameObject d = Instantiate(killZone, new Vector2(0, -stageSize.y-5), Quaternion.identity) as GameObject;
+		GameObject d = Instantiate(bounds, new Vector2(0, -stageSize.y-5), Quaternion.identity) as GameObject;
 		d.transform.localScale = new Vector2 (-stageSize.x, 1);
 	}
 
